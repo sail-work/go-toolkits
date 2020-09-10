@@ -2,6 +2,9 @@ package microtools
 
 import (
 	"testing"
+	"time"
+
+	"github.com/sparrc/go-ping"
 )
 
 type kv struct {
@@ -38,4 +41,17 @@ func Test_ConfigGet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_(t *testing.T) {
+	start := time.Now()
+	p, _ := ping.NewPinger("127.0.0.1")
+	p.SetPrivileged(false)
+	p.Count = 1
+	p.OnRecv = func(packet *ping.Packet) {
+		t.Logf("rtt:%s", packet.Rtt)
+	}
+
+	p.Run()
+	t.Logf("time:%s", time.Since(start))
 }
