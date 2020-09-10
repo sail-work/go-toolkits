@@ -31,6 +31,7 @@ func LowLatencySelector(privileged bool, d time.Duration) client.Option {
 			timeout:    d,
 			privileged: privileged,
 		}
+		o.Selector.Init()
 	}
 }
 
@@ -138,12 +139,12 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 
 func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 	p, err := ping.NewPinger(node.n.Address)
-	p.SetPrivileged(s.privileged)
 	if err != nil {
 		node.latency = s.timeout
 		s.addNode(node)
 		return
 	}
+	p.SetPrivileged(s.privileged)
 	p.Count = 1
 	p.OnRecv = func(packet *ping.Packet) {
 		node.latency = packet.Rtt
