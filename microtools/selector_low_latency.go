@@ -1,6 +1,7 @@
 package microtools
 
 import (
+	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -77,12 +78,12 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 	s.mu.RLock()
 	for _, service := range services {
 		for _, n := range service.Nodes {
-			latency, ok := s.nodes[n.Id]
+			cacheNode, ok := s.nodes[n.Id]
 			if !ok {
-				latency = &node{n: n}
+				cacheNode = &node{n: n}
 				diff = true
 			}
-			nodes = append(nodes, latency)
+			nodes = append(nodes, cacheNode)
 		}
 	}
 	s.mu.RUnlock()
@@ -137,7 +138,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 		if result == nil {
 			return nil, selector.ErrNoneAvailable
 		}
-
+		fmt.Printf("address:%s\n", result.Address)
 		return result, nil
 	}
 }
@@ -162,6 +163,7 @@ func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 		case recv <- node.n:
 		default:
 		}
+		fmt.Printf("address:%s latency:%s\n", packet.Addr, packet.Rtt)
 		s.addNode(node)
 	}
 	p.Run()
