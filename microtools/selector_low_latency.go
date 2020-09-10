@@ -1,6 +1,7 @@
 package microtools
 
 import (
+	"net"
 	"sort"
 	"sync"
 	"time"
@@ -133,12 +134,21 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 			return nil, selector.ErrNoneAvailable
 		}
 
+		if result == nil {
+			return nil, selector.ErrNoneAvailable
+		}
+
 		return result, nil
 	}
 }
 
 func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
-	p, err := ping.NewPinger(node.n.Address)
+	host, _, err := net.SplitHostPort(node.n.Address)
+	if err != nil {
+		node.latency = s.timeout
+		s.addNode(node)
+	}
+	p, err := ping.NewPinger(host)
 	if err != nil {
 		node.latency = s.timeout
 		s.addNode(node)
