@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hkjojo/go-toolkits/log"
-
 	"github.com/micro/go-micro/v2/client"
 	"github.com/micro/go-micro/v2/client/selector"
 	"github.com/micro/go-micro/v2/registry"
@@ -21,7 +19,7 @@ var (
 	// DefaultMaxLatency is the default max latency
 	DefaultMaxLatency = time.Second
 
-	regex = `min/avg/max/stddev = ([0-9./]+) ms`
+	regex = `min/avg/max([\s\S]*)`
 )
 
 type lowLatencySelector struct {
@@ -179,14 +177,12 @@ func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 	cmd := exec.Command("ping", "-c", "1", host)
 	b, err := cmd.Output()
 	if err != nil {
-		log.Infof("ping err:%s", err)
 		s.addNode(true, node)
 		return
 	}
 
 	rtt, err := parsePing(string(b))
 	if err != nil {
-		log.Infof("parse ping err:%s", err)
 		s.addNode(true, node)
 		return
 	}
@@ -232,14 +228,14 @@ func (n nodes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
 func parsePing(result string) (time.Duration, error) {
 	re := regexp.MustCompile(regex)
 	sub := re.FindStringSubmatch(result)
-	if len(sub) != 2 {
+	if len(sub) < 2 {
 		return 0, fmt.Errorf("parse ping error")
 	}
 
 	s := strings.Split(sub[0], " ")
 	unit := s[len(s)-1]
-	times := strings.Split(sub[1], "/")
-	if len(times) != 4 {
+	times := strings.Split(s[len(s)-2], "/")
+	if len(times) < 3 {
 		return 0, fmt.Errorf("parse ping error")
 	}
 	return time.ParseDuration(fmt.Sprintf("%s%s", times[1], unit))
