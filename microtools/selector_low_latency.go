@@ -1,20 +1,25 @@
 package microtools
 
 import (
+	"fmt"
 	"net"
+	"os/exec"
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/micro/go-micro/v2/client"
 	"github.com/micro/go-micro/v2/client/selector"
 	"github.com/micro/go-micro/v2/registry"
-	"github.com/sparrc/go-ping"
 )
 
 var (
 	// DefaultMaxLatency is the default max latency
 	DefaultMaxLatency = time.Second
+
+	regex = `min/avg/max/stddev = ([0-9./]+) ms`
 )
 
 type lowLatencySelector struct {
@@ -23,14 +28,12 @@ type lowLatencySelector struct {
 	maxLatency time.Duration
 	nodes      map[string]*node
 	blacklist  map[string]*node
-	privileged bool
 }
 
 func LowLatencySelector(opts ...SelectOption) client.Option {
 	return func(o *client.Options) {
 		selectOpt := &SelectOptions{
 			MaxLatency: GetMaxLatency(),
-			Privileged: GetPrivileged(),
 		}
 
 		for _, opt := range opts {
@@ -46,7 +49,6 @@ func LowLatencySelector(opts ...SelectOption) client.Option {
 			blacklist:  make(map[string]*node),
 			selector:   s,
 			maxLatency: selectOpt.MaxLatency,
-			privileged: selectOpt.Privileged,
 		}
 
 		o.Selector.Init()
@@ -171,30 +173,33 @@ func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 		s.addNode(true, node)
 		return
 	}
-	p, err := ping.NewPinger(host)
+
+	cmd := exec.Command("ping", "-c", "1", host)
+	b, err := cmd.Output()
 	if err != nil {
 		s.addNode(true, node)
 		return
 	}
 
-	p.SetPrivileged(s.privileged)
-	p.Count = 1
-	p.OnRecv = func(packet *ping.Packet) {
-		if packet.Rtt > s.maxLatency {
-			// if the maximum Latency is exceeded, add to the blacklist
-			s.addNode(true, node)
-			return
-		}
-		node.latency = packet.Rtt
-		select {
-		case recv <- node.n:
-		default:
-			// already lower latency
-			return
-		}
-		s.addNode(false, node)
+	rtt, err := parsePing(string(b))
+	if err != nil {
+		s.addNode(true, node)
+		return
 	}
-	p.Run()
+
+	if rtt > s.maxLatency {
+		// if the maximum Latency is exceeded, add to the blacklist
+		s.addNode(true, node)
+		return
+	}
+	node.latency = rtt
+	select {
+	case recv <- node.n:
+	default:
+		// already lower latency
+		return
+	}
+	s.addNode(false, node)
 }
 
 func (s *lowLatencySelector) addNode(blacklist bool, node *node) {
@@ -219,3 +224,19 @@ func (n nodes) Len() int { return len(n) }
 func (n nodes) Less(i, j int) bool { return n[i].latency < n[j].latency }
 
 func (n nodes) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
+
+func parsePing(result string) (time.Duration, error) {
+	re := regexp.MustCompile(regex)
+	sub := re.FindStringSubmatch(result)
+	if len(sub) != 2 {
+		return 0, fmt.Errorf("parse ping error")
+	}
+
+	s := strings.Split(sub[0], " ")
+	unit := s[len(s)-1]
+	times := strings.Split(sub[1], "/")
+	if len(times) != 4 {
+		return 0, fmt.Errorf("parse ping error")
+	}
+	return time.ParseDuration(fmt.Sprintf("%s%s", times[1], unit))
+}
