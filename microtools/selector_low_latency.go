@@ -1,11 +1,12 @@
 package microtools
 
 import (
-	"fmt"
 	"net"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/hkjojo/go-toolkits/log"
 
 	"github.com/micro/go-micro/v2/client"
 	"github.com/micro/go-micro/v2/client/selector"
@@ -138,7 +139,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 		if result == nil {
 			return nil, selector.ErrNoneAvailable
 		}
-		fmt.Printf("address:%s\n", result.Address)
+		log.Infof("address:%s\n", result.Address)
 		return result, nil
 	}
 }
@@ -163,7 +164,7 @@ func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 		case recv <- node.n:
 		default:
 		}
-		fmt.Printf("address:%s latency:%s\n", packet.Addr, packet.Rtt)
+		log.Infof("address:%s latency:%s\n", packet.Addr, packet.Rtt)
 		s.addNode(node)
 	}
 	p.Run()
