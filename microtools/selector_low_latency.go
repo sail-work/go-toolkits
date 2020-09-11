@@ -232,7 +232,7 @@ func parsePing(result string) (time.Duration, error) {
 		return 0, fmt.Errorf("parse ping error")
 	}
 
-	s := strings.Split(sub[0], " ")
+	s := strings.Split(strings.TrimSpace(sub[0]), " ")
 	unit := s[len(s)-1]
 	times := strings.Split(s[len(s)-2], "/")
 	if len(times) < 3 {
