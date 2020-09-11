@@ -43,6 +43,7 @@ func LowLatencySelector(opts ...SelectOption) client.Option {
 		}
 		o.Selector = &lowLatencySelector{
 			nodes:      make(map[string]*node),
+			blacklist:  make(map[string]*node),
 			selector:   s,
 			maxLatency: selectOpt.MaxLatency,
 			privileged: selectOpt.Privileged,
