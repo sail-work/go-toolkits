@@ -144,6 +144,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 		if result == nil {
 			return nil, selector.ErrNoneAvailable
 		}
+
 		return result, nil
 	}
 }
