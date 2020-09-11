@@ -2,6 +2,7 @@ package microtools
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/micro/cli/v2"
@@ -30,6 +31,8 @@ type CmdOptions struct {
 	RegistryAddress      string
 	PreferedNetworks     []string
 	ConfigAddress        string
+	Privileged           bool
+	MaxLatency           time.Duration
 
 	ServiceName string
 }
@@ -66,6 +69,16 @@ func InitCmd() error {
 			Name:    "prefered_networks",
 			EnvVars: []string{"MICRO_PREFERED_NETWORKS"},
 			Usage:   "Prefered networks",
+		},
+		&cli.StringSliceFlag{
+			Name:    "max_latency",
+			EnvVars: []string{"MICRO_MAX_LATENCY"},
+			Usage:   "Selector Max Latency",
+		},
+		&cli.StringSliceFlag{
+			Name:    "privileged",
+			EnvVars: []string{"MICRO_PRIVILEGED"},
+			Usage:   "privileged",
 		})
 
 	before := app.Before
@@ -88,6 +101,7 @@ func InitCmd() error {
 			ReplicaID:        ctx.Int("replica_id"),
 			ConfigAddress:    ctx.String("config_address"),
 			PreferedNetworks: ctx.StringSlice("prefered_networks"),
+			Privileged:       ctx.Bool("privileged"),
 		}
 
 		options.ServiceName = FormatStrings([]string{
@@ -102,6 +116,14 @@ func InitCmd() error {
 			if err != nil {
 				return err
 			}
+		}
+
+		if t := ctx.String("max_latency"); len(t) > 0 {
+			d, err := time.ParseDuration(t)
+			if err != nil {
+				return fmt.Errorf("failed to parse max_latency: %v", t)
+			}
+			options.MaxLatency = d
 		}
 
 		return before(ctx)
@@ -260,4 +282,14 @@ func GetRegisterInternal() time.Duration {
 // SetOptions ...
 func SetOptions(f func(*CmdOptions)) {
 	f(options)
+}
+
+// GetPrivileged ..
+func GetPrivileged() bool {
+	return options.Privileged
+}
+
+// GetMaxLatency ..
+func GetMaxLatency() time.Duration {
+	return options.MaxLatency
 }
