@@ -1,7 +1,6 @@
 package microtools
 
 import (
-	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -13,26 +12,42 @@ import (
 	"github.com/sparrc/go-ping"
 )
 
+var (
+	// DefaultMaxLatency is the default max latency
+	DefaultMaxLatency = time.Second
+)
+
 type lowLatencySelector struct {
-	selector   selector.Selector
-	timeout    time.Duration
-	nodes      map[string]*node
-	privileged bool
 	mu         sync.RWMutex
+	selector   selector.Selector
+	maxLatency time.Duration
+	nodes      map[string]*node
+	blacklist  map[string]*node
+	privileged bool
 }
 
-func LowLatencySelector(privileged bool, d time.Duration) client.Option {
+func LowLatencySelector(opts ...SelectOption) client.Option {
 	return func(o *client.Options) {
+		selectOpt := &SelectOptions{
+			MaxLatency: GetMaxLatency(),
+			Privileged: GetPrivileged(),
+		}
+
+		for _, opt := range opts {
+			opt(selectOpt)
+		}
+
 		s := o.Selector
 		if s == nil {
 			s = selector.DefaultSelector
 		}
 		o.Selector = &lowLatencySelector{
-			selector:   s,
 			nodes:      make(map[string]*node),
-			timeout:    d,
-			privileged: privileged,
+			selector:   s,
+			maxLatency: selectOpt.MaxLatency,
+			privileged: selectOpt.Privileged,
 		}
+
 		o.Selector.Init()
 	}
 }
@@ -70,7 +85,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 	var (
 		nodes   nodes
 		lowest  *node
-		latency = s.timeout
+		latency = s.maxLatency
 		result  *registry.Node
 		recv    chan *registry.Node
 		diff    bool
@@ -78,6 +93,12 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 	s.mu.RLock()
 	for _, service := range services {
 		for _, n := range service.Nodes {
+			// check blacklist
+			if _, ok := s.blacklist[n.Id]; ok {
+				continue
+			}
+
+			// check cache
 			cacheNode, ok := s.nodes[n.Id]
 			if !ok {
 				cacheNode = &node{n: n}
@@ -138,7 +159,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 		if result == nil {
 			return nil, selector.ErrNoneAvailable
 		}
-		fmt.Printf("address:%s\n", result.Address)
+
 		return result, nil
 	}
 }
@@ -146,32 +167,42 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 	host, _, err := net.SplitHostPort(node.n.Address)
 	if err != nil {
-		node.latency = s.timeout
-		s.addNode(node)
+		s.addNode(true, node)
+		return
 	}
 	p, err := ping.NewPinger(host)
 	if err != nil {
-		node.latency = s.timeout
-		s.addNode(node)
+		s.addNode(true, node)
 		return
 	}
+
 	p.SetPrivileged(s.privileged)
 	p.Count = 1
 	p.OnRecv = func(packet *ping.Packet) {
+		if packet.Rtt > s.maxLatency {
+			// if the maximum Latency is exceeded, add to the blacklist
+			s.addNode(true, node)
+			return
+		}
 		node.latency = packet.Rtt
 		select {
 		case recv <- node.n:
 		default:
+			// already lower latency
+			return
 		}
-		fmt.Printf("address:%s latency:%s\n", packet.Addr, packet.Rtt)
-		s.addNode(node)
+		s.addNode(false, node)
 	}
 	p.Run()
 }
 
-func (s *lowLatencySelector) addNode(node *node) {
+func (s *lowLatencySelector) addNode(blacklist bool, node *node) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if blacklist {
+		s.blacklist[node.n.Id] = node
+		return
+	}
 	s.nodes[node.n.Id] = node
 }
 
