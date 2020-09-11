@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hkjojo/go-toolkits/log"
+
 	"github.com/micro/go-micro/v2/client"
 	"github.com/micro/go-micro/v2/client/selector"
 	"github.com/micro/go-micro/v2/registry"
@@ -177,12 +179,14 @@ func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
 	cmd := exec.Command("ping", "-c", "1", host)
 	b, err := cmd.Output()
 	if err != nil {
+		log.Infof("ping err:%s", err)
 		s.addNode(true, node)
 		return
 	}
 
 	rtt, err := parsePing(string(b))
 	if err != nil {
+		log.Infof("parse ping err:%s", err)
 		s.addNode(true, node)
 		return
 	}
