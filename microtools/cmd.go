@@ -31,7 +31,6 @@ type CmdOptions struct {
 	RegistryAddress      string
 	PreferedNetworks     []string
 	ConfigAddress        string
-	Privileged           bool
 	MaxLatency           time.Duration
 
 	ServiceName string
@@ -74,11 +73,6 @@ func InitCmd() error {
 			Name:    "max_latency",
 			EnvVars: []string{"MICRO_MAX_LATENCY"},
 			Usage:   "Sets the low_latency_selector max latency. e.g 500ms, 5s, 1m. Default: 1s",
-		},
-		&cli.BoolFlag{
-			Name:    "privileged",
-			EnvVars: []string{"MICRO_PRIVILEGED"},
-			Usage:   "privileged",
 		})
 
 	before := app.Before
@@ -101,7 +95,6 @@ func InitCmd() error {
 			ReplicaID:        ctx.Int("replica_id"),
 			ConfigAddress:    ctx.String("config_address"),
 			PreferedNetworks: ctx.StringSlice("prefered_networks"),
-			Privileged:       ctx.Bool("privileged"),
 			MaxLatency:       DefaultMaxLatency,
 		}
 
@@ -283,11 +276,6 @@ func GetRegisterInternal() time.Duration {
 // SetOptions ...
 func SetOptions(f func(*CmdOptions)) {
 	f(options)
-}
-
-// GetPrivileged ..
-func GetPrivileged() bool {
-	return options.Privileged
 }
 
 // GetMaxLatency ..

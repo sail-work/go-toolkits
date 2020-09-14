@@ -86,12 +86,118 @@ func (s *lowLatencySelector) String() string {
 
 func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.Next {
 	var (
-		nodes   nodes
-		lowest  *node
-		latency = s.maxLatency
-		result  *registry.Node
-		recv    chan *registry.Node
-		diff    bool
+		nodes  = s.getNodes(services)
+		timout = s.maxLatency
+		result *registry.Node
+		recv   chan interface{}
+		err    error
+	)
+
+	for _, n := range nodes {
+		if n.latency != 0 {
+			timout = n.latency
+			result = n.n
+			break
+		}
+
+		if recv == nil {
+			recv = make(chan interface{})
+		}
+		go s.ping(n, recv)
+
+	}
+	if recv != nil {
+		select {
+		case <-time.After(timout):
+			err = fmt.Errorf("ping has timeout %s, %s", timout, err)
+		case v := <-recv:
+			switch va := v.(type) {
+			case *registry.Node:
+				result = va
+			default:
+				err = fmt.Errorf("%s,%s", va, err)
+			}
+		}
+	}
+
+	return func() (*registry.Node, error) {
+		if len(nodes) == 0 {
+			return nil, selector.ErrNoneAvailable
+		}
+
+		if result == nil {
+			if err != nil {
+				return nil, err
+			}
+			return nil, selector.ErrNoneAvailable
+		}
+
+		return result, nil
+	}
+}
+
+func (s *lowLatencySelector) ping(node *node, recv chan interface{}) {
+	var err error
+	defer func() {
+		var (
+			v         interface{}
+			blacklist bool
+		)
+		if err != nil {
+			v = err
+			blacklist = true
+		} else {
+			v = node.n
+		}
+		select {
+		case recv <- v:
+		default:
+			// already lower latency
+		}
+		s.addNode(blacklist, node)
+	}()
+
+	host, _, err := net.SplitHostPort(node.n.Address)
+	if err != nil {
+		return
+	}
+
+	// ping only once
+	cmd := exec.Command("ping", "-c", "1", host)
+	b, err := cmd.Output()
+	if err != nil {
+		err = fmt.Errorf("[%s]%s", host, err)
+		return
+	}
+
+	rtt, err := parsePing(string(b))
+	if err != nil {
+		err = fmt.Errorf("[%s]%s", host, err)
+		return
+	}
+
+	if rtt > s.maxLatency {
+		// if the maximum Latency is exceeded, add to the blacklist
+		err = fmt.Errorf("[%s]maximum latency is exceeded", host)
+		return
+	}
+	node.latency = rtt
+}
+
+func (s *lowLatencySelector) addNode(blacklist bool, node *node) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if blacklist {
+		s.blacklist[node.n.Id] = node
+		return
+	}
+	s.nodes[node.n.Id] = node
+}
+
+func (s *lowLatencySelector) getNodes(services []*registry.Service) nodes {
+	var (
+		nodes nodes
+		diff  bool
 	)
 	s.mu.RLock()
 	for _, service := range services {
@@ -128,88 +234,8 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 		}
 		s.mu.Unlock()
 	}
-
 	sort.Sort(nodes)
-	for _, n := range nodes {
-		if n.latency != 0 {
-			lowest = n
-			result = lowest.n
-			break
-		}
-
-		if recv == nil {
-			recv = make(chan *registry.Node)
-		}
-		go s.ping(n, recv)
-
-	}
-	if recv != nil {
-		if lowest != nil {
-			latency = lowest.latency
-		}
-		select {
-		case <-time.After(latency):
-		case n := <-recv:
-			result = n
-		}
-	}
-
-	return func() (*registry.Node, error) {
-		if len(nodes) == 0 {
-			return nil, selector.ErrNoneAvailable
-		}
-
-		if result == nil {
-			return nil, selector.ErrNoneAvailable
-		}
-
-		return result, nil
-	}
-}
-
-func (s *lowLatencySelector) ping(node *node, recv chan *registry.Node) {
-	host, _, err := net.SplitHostPort(node.n.Address)
-	if err != nil {
-		s.addNode(true, node)
-		return
-	}
-
-	cmd := exec.Command("ping", "-c", "1", host)
-	b, err := cmd.Output()
-	if err != nil {
-		s.addNode(true, node)
-		return
-	}
-
-	rtt, err := parsePing(string(b))
-	if err != nil {
-		s.addNode(true, node)
-		return
-	}
-
-	if rtt > s.maxLatency {
-		// if the maximum Latency is exceeded, add to the blacklist
-		s.addNode(true, node)
-		return
-	}
-	node.latency = rtt
-	select {
-	case recv <- node.n:
-	default:
-		// already lower latency
-		return
-	}
-	s.addNode(false, node)
-}
-
-func (s *lowLatencySelector) addNode(blacklist bool, node *node) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if blacklist {
-		s.blacklist[node.n.Id] = node
-		return
-	}
-	s.nodes[node.n.Id] = node
+	return nodes
 }
 
 type node struct {

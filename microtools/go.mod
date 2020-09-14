@@ -13,5 +13,6 @@ require (
 	github.com/micro/go-micro/v2 v2.6.0
 	github.com/micro/go-plugins/config/source/consul/v2 v2.5.0
 	github.com/sparrc/go-ping v0.0.0-20190613174326-4e5b6552494c
+	github.com/stretchr/testify v1.4.0
 	google.golang.org/grpc v1.26.0
 )
