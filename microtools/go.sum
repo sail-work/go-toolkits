@@ -267,7 +267,8 @@ github.com/hkjojo/go-micro/v2 v2.6.2 h1:BqCWv6qwM7Wl+txPGuaSB/Vp4yGRsXq4M0PTeR+N
 github.com/hkjojo/go-micro/v2 v2.6.2/go.mod h1:60HMKlDN4ShZDJRrlgdcAmkCWNhQbYv+CDG3r7iLE34=
 github.com/hkjojo/go-plugins/config/source/consul/v2 v2.5.0 h1:82oARsXxH+nFUMLsfDiMghWV+oyR0AXSMksnFOmbHDY=
 github.com/hkjojo/go-plugins/config/source/consul/v2 v2.5.0/go.mod h1:AHybwQVoYwB92JDSeFEjxjPymZnXBpJvD90dsiQ9D08=
-github.com/hkjojo/go-toolkits/log v1.0.1/go.mod h1:QHAWio0tKzZfIAvQKpp8Cmtz6SEOFZuxmAPY2GmANQY=
+github.com/hkjojo/go-toolkits/log v1.0.2 h1:OzoREX9XAhiVWuYrrV3WTNIaEYFMAtYUcBMdj2WWqUo=
+github.com/hkjojo/go-toolkits/log v1.0.2/go.mod h1:QHAWio0tKzZfIAvQKpp8Cmtz6SEOFZuxmAPY2GmANQY=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/iij/doapi v0.0.0-20190504054126-0bbf12d6d7df/go.mod h1:QMZY7/J/KSQEhKWFeDesPjMj+wCHReeknARU3wqlyN4=
