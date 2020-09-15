@@ -86,16 +86,16 @@ func (s *lowLatencySelector) String() string {
 
 func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.Next {
 	var (
-		nodes  = s.getNodes(services)
-		timout = s.maxLatency
-		result *registry.Node
-		recv   chan interface{}
-		err    error
+		nodes   = s.getNodes(services)
+		timeout = s.maxLatency
+		result  *registry.Node
+		recv    chan interface{}
+		err     error
 	)
 
 	for _, n := range nodes {
 		if n.latency != 0 {
-			timout = n.latency
+			timeout = n.latency
 			result = n.n
 			break
 		}
@@ -108,14 +108,14 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 	}
 	if recv != nil {
 		select {
-		case <-time.After(timout):
-			err = fmt.Errorf("ping has timeout %s, %s", timout, err)
+		case <-time.After(timeout):
+			err = fmt.Errorf("ping has timeout %s, %s", timeout, err)
 		case v := <-recv:
 			switch va := v.(type) {
 			case *registry.Node:
 				result = va
 			default:
-				err = fmt.Errorf("%s,%s", va, err)
+				err = fmt.Errorf("%s, %s", va, err)
 			}
 		}
 	}
@@ -194,10 +194,9 @@ func (s *lowLatencySelector) addNode(blacklist bool, node *node) {
 	s.nodes[node.n.Id] = node
 }
 
-func (s *lowLatencySelector) getNodes(services []*registry.Service) nodes {
+func (s *lowLatencySelector) getNodes(services []*registry.Service) (nodes nodes) {
 	var (
-		nodes nodes
-		diff  bool
+		diff bool
 	)
 	s.mu.RLock()
 	for _, service := range services {
@@ -219,23 +218,19 @@ func (s *lowLatencySelector) getNodes(services []*registry.Service) nodes {
 	s.mu.RUnlock()
 
 	if diff {
-		s.mu.Lock()
-		for id, n := range s.nodes {
-			var exist bool
-			for _, n2 := range nodes {
-				if n2.n.Id == n.n.Id {
-					exist = true
-					break
-				}
-			}
-			if !exist {
-				delete(s.nodes, id)
-			}
+		// when the latency of the new node is greater than the lowest latency in the cache,
+		// it will lead to no matching node, so clear cache
+		for _, node := range nodes {
+			node.latency = 0
 		}
+		s.mu.Lock()
+		s.nodes = make(map[string]*node)
+		s.blacklist = make(map[string]*node)
 		s.mu.Unlock()
+		return
 	}
 	sort.Sort(nodes)
-	return nodes
+	return
 }
 
 type node struct {
