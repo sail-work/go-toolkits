@@ -26,7 +26,6 @@ type lowLatencySelector struct {
 	mu         sync.RWMutex
 	selector   selector.Selector
 	maxLatency time.Duration
-	callback   SelectorCallBack
 	nodes      map[string]*node
 	blacklist  map[string]*node
 }
@@ -50,7 +49,6 @@ func LowLatencySelector(opts ...SelectOption) client.Option {
 			blacklist:  make(map[string]*node),
 			selector:   s,
 			maxLatency: selectOpt.MaxLatency,
-			callback:   selectOpt.CallBack,
 		}
 
 		o.Selector.Init()
@@ -120,9 +118,6 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 				err = fmt.Errorf("%s, %s", va, err)
 			}
 		}
-	}
-	if result != nil && s.callback != nil {
-		s.callback(result.Address)
 	}
 
 	return func() (*registry.Node, error) {

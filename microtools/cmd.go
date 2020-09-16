@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/micro/go-micro/v2/client"
+
 	"github.com/micro/cli/v2"
 	"github.com/micro/go-micro/v2/config/cmd"
 	mmetadata "github.com/micro/go-micro/v2/metadata"
@@ -110,6 +112,8 @@ func InitCmd() error {
 			if err != nil {
 				return err
 			}
+		} else {
+			options.ClientRequestTimeout = client.DefaultRequestTimeout
 		}
 
 		if t := ctx.String("max_latency"); len(t) > 0 {

@@ -6,7 +6,6 @@ import (
 
 type SelectOptions struct {
 	MaxLatency time.Duration
-	CallBack   SelectorCallBack
 }
 
 type SelectorCallBack func(addr string)
@@ -18,12 +17,5 @@ type SelectOption func(*SelectOptions)
 func MaxLatency(latency time.Duration) SelectOption {
 	return func(o *SelectOptions) {
 		o.MaxLatency = latency
-	}
-}
-
-// CallBack sets the callback used by the low latency selector
-func CallBack(callback SelectorCallBack) SelectOption {
-	return func(o *SelectOptions) {
-		o.CallBack = callback
 	}
 }
