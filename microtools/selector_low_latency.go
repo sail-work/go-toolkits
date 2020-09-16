@@ -1,6 +1,7 @@
 package microtools
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -109,13 +110,13 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 	if recv != nil {
 		select {
 		case <-time.After(timeout):
-			err = fmt.Errorf("ping has timeout %s, %s", timeout, err)
+			err = fmt.Errorf("ping has timeout %s, %v", timeout, err)
 		case v := <-recv:
 			switch va := v.(type) {
 			case *registry.Node:
 				result = va
 			default:
-				err = fmt.Errorf("%s, %s", va, err)
+				err = fmt.Errorf("%s, %v", va, err)
 			}
 		}
 	}
@@ -129,7 +130,7 @@ func (s *lowLatencySelector) LowLatency(services []*registry.Service) selector.N
 			if err != nil {
 				return nil, err
 			}
-			return nil, selector.ErrNoneAvailable
+			return nil, errors.New("none result")
 		}
 
 		return result, nil
@@ -166,13 +167,13 @@ func (s *lowLatencySelector) ping(node *node, recv chan interface{}) {
 	cmd := exec.Command("ping", "-c", "1", host)
 	b, err := cmd.Output()
 	if err != nil {
-		err = fmt.Errorf("[%s]%s", host, err)
+		err = fmt.Errorf("[%s]%v", host, err)
 		return
 	}
 
 	rtt, err := parsePing(string(b))
 	if err != nil {
-		err = fmt.Errorf("[%s]%s", host, err)
+		err = fmt.Errorf("[%s]%v", host, err)
 		return
 	}
 
